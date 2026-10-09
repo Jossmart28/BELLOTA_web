@@ -226,6 +226,7 @@ function StatCard({ icon, value, label, bgIcon }: { icon: React.ReactNode, value
         {icon}
       </div>
       <div>
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
         <p className="text-xl font-bold text-[#3B82F6] leading-tight" style={{color: typeof icon === 'object' && icon !== null && 'props' in icon ? (icon as any).props.className.match(/text-\[([^\]]+)\]/)?.[1] || (icon as any).props.className.match(/text-([a-z]+-500)/)?.[1]?.replace('500', '500') : undefined}}>
           {/* Extract color from icon classes to match text color if needed, or just hardcode based on screenshot. The screenshot has different colors for the number: Blue for total, Green for Hoy, Red for login fallido */}
           <span className={

@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { User, DashboardStats } from '@/types';
+import { User } from '@/types';
 import { Search, LogOut, Users, Settings, RotateCcw, ShieldCheck, CheckCircle2, XCircle, SearchSlash } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
@@ -11,7 +11,6 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'usuarios' | 'sistema'>('usuarios');
   const [search, setSearch] = useState('');
   const { user: currentUser, logout } = useAuth();
-  const queryClient = useQueryClient();
 
   const { data: users = [], isLoading, refetch, isFetching } = useQuery<User[]>({
     queryKey: ['users'],
