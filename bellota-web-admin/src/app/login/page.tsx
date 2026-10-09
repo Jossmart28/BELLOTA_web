@@ -16,10 +16,16 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
-      // Endpoint según especificación
-      const response = await api.post('/auth/login', { email, password });
+      const formData = new URLSearchParams();
+      formData.append('username', email);
+      formData.append('password', password);
+
+      const response = await api.post('/auth/login', formData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
       const { access_token } = response.data;
       
       // Obtener datos del usuario recién logueado
