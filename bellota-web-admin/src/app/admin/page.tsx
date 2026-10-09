@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { User } from '@/types';
-import { Search, LogOut, Users, Settings, RotateCcw, ShieldCheck, CheckCircle2, XCircle, SearchSlash, Power, UserCog } from 'lucide-react';
+import { Search, LogOut, Users, Settings, RotateCcw, ShieldCheck, CheckCircle2, XCircle, SearchSlash } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 
