@@ -2,155 +2,221 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { User, ROLES_CONFIG, DashboardStats } from '@/types';
-import { Search, CheckCircle2, XCircle, Users, Activity, ShieldCheck, Key } from 'lucide-react';
-import { RoleGuard } from '@/context/AuthContext';
+import { User, DashboardStats } from '@/types';
+import { Search, LogOut, Users, Settings, RotateCcw, ShieldCheck, CheckCircle2, XCircle, SearchSlash } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import Link from 'next/link';
 
 export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState<'usuarios' | 'sistema'>('usuarios');
   const [search, setSearch] = useState('');
+  const { user: currentUser, logout } = useAuth();
   const queryClient = useQueryClient();
 
-  // Fetch Users
-  const { data: users = [], isLoading } = useQuery<User[]>({
+  const { data: users = [], isLoading, refetch, isFetching } = useQuery<User[]>({
     queryKey: ['users'],
     queryFn: async () => {
       const res = await api.get('/admin/users');
       return res.data;
-    }
-  });
-
-  // KPI Mock or Fetch (Depende de si existe el endpoint)
-  const stats: DashboardStats = {
-    totalUsers: users.length,
-    activeUsers: users.filter(u => u.is_active).length,
-    pendingRoles: users.filter(u => u.role === 'usuario').length,
-    totalAudits: 1245
-  };
-
-  // Mutations
-  const updateRoleMutation = useMutation({
-    mutationFn: async ({ id, role }: { id: number, role: string }) => {
-      await api.put(`/admin/users/${id}/role`, { role });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] })
-  });
-
-  const toggleStatusMutation = useMutation({
-    mutationFn: async ({ id, is_active }: { id: number, is_active: boolean }) => {
-      await api.put(`/admin/users/${id}/status`, { is_active });
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] })
+    // Prevent refetch on window focus to avoid annoying loading states in mobile
+    refetchOnWindowFocus: false,
   });
 
   const filteredUsers = users.filter(u => 
     u.name.toLowerCase().includes(search.toLowerCase()) || 
-    u.email.toLowerCase().includes(search.toLowerCase())
+    u.email.toLowerCase().includes(search.toLowerCase()) ||
+    u.role.toLowerCase().includes(search.toLowerCase())
   );
 
+  const stats = {
+    total: users.length,
+    admins: users.filter(u => u.role === 'admin').length,
+    auditores: users.filter(u => u.role === 'auditor').length,
+    estandar: users.filter(u => u.role === 'usuario').length,
+    suspendidas: users.filter(u => !u.is_active).length,
+  };
+
   return (
-    <RoleGuard allowedRoles={['admin']}>
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-bold text-stone-900">Gestión de Usuarios</h1>
-          <p className="text-stone-500">Administra accesos, roles y estado de las cuentas</p>
+    <div className="w-full max-w-md mx-auto min-h-screen flex flex-col bg-[#FAF6ED]">
+      {/* Top Header */}
+      <div className="bg-[#D3574D] text-white pt-10 pb-0 shadow-sm relative">
+        <div className="flex justify-between items-center px-4 pb-4">
+          <div className="w-8"></div> {/* Spacer */}
+          <h1 className="text-xl font-bold tracking-wide">Panel de Administrador</h1>
+          <div className="flex gap-4">
+            <button onClick={() => refetch()} className="opacity-90 hover:opacity-100 transition">
+              <RotateCcw className={`w-5 h-5 ${isFetching ? 'animate-spin' : ''}`} />
+            </button>
+            <button onClick={logout} className="opacity-90 hover:opacity-100 transition">
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <KpiCard title="Total Usuarios" value={stats.totalUsers} icon={<Users className="text-amber-500" />} />
-          <KpiCard title="Usuarios Activos" value={stats.activeUsers} icon={<Activity className="text-green-500" />} />
-          <KpiCard title="Administradores" value={users.filter(u=>u.role==='admin').length} icon={<ShieldCheck className="text-red-500" />} />
-          <KpiCard title="Usuarios Regulares" value={stats.pendingRoles} icon={<Key className="text-blue-500" />} />
+        {/* Tabs */}
+        <div className="flex w-full mt-2">
+          <button 
+            onClick={() => setActiveTab('usuarios')}
+            className={`flex-1 flex flex-col items-center gap-1 pb-3 relative ${activeTab === 'usuarios' ? 'text-white' : 'text-white/70'}`}
+          >
+            <Users className="w-6 h-6" />
+            <span className="text-sm font-medium">Usuarios</span>
+            {activeTab === 'usuarios' && (
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-1 bg-white rounded-t-md" />
+            )}
+          </button>
+          <button 
+            onClick={() => setActiveTab('sistema')}
+            className={`flex-1 flex flex-col items-center gap-1 pb-3 relative ${activeTab === 'sistema' ? 'text-white' : 'text-white/70'}`}
+          >
+            <Settings className="w-6 h-6" />
+            <span className="text-sm font-medium">Sistema</span>
+            {activeTab === 'sistema' && (
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-1 bg-white rounded-t-md" />
+            )}
+          </button>
         </div>
+      </div>
 
-        {/* Tabla / Filtros */}
-        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
-          <div className="p-4 border-b border-stone-200 flex justify-between items-center bg-stone-50/50">
-            <div className="relative w-72">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-stone-400" />
+      {/* Main Content Area */}
+      <div className="flex-1 p-4">
+        {activeTab === 'usuarios' ? (
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {/* Search */}
+            <div className="relative mb-4">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-stone-300" />
               <input 
                 type="text"
-                placeholder="Buscar por nombre o correo..."
-                className="w-full pl-9 pr-4 py-2 border border-stone-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                placeholder="Buscar por nombre, correo o rol..."
+                className="w-full pl-11 pr-4 py-3 bg-[#F5EDE1] border-none rounded-full text-sm focus:ring-2 focus:ring-[#D3574D] outline-none text-stone-700 placeholder:text-stone-400"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider border-b border-stone-200">
-                  <th className="p-4 font-medium">Usuario</th>
-                  <th className="p-4 font-medium">Rol</th>
-                  <th className="p-4 font-medium">Estado</th>
-                  <th className="p-4 font-medium text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {isLoading ? (
-                  <tr><td colSpan={4} className="p-8 text-center text-stone-500">Cargando usuarios...</td></tr>
-                ) : filteredUsers.length === 0 ? (
-                  <tr><td colSpan={4} className="p-8 text-center text-stone-500">No se encontraron resultados</td></tr>
-                ) : (
-                  filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-stone-50/50 transition-colors">
-                      <td className="p-4">
-                        <div className="font-medium text-stone-900">{user.name}</div>
-                        <div className="text-xs text-stone-500">{user.email}</div>
-                      </td>
-                      <td className="p-4">
-                        <select 
-                          className="text-sm border-stone-200 rounded-md bg-stone-50 focus:ring-amber-500 outline-none p-1"
-                          value={user.role}
-                          onChange={(e) => updateRoleMutation.mutate({ id: user.id, role: e.target.value })}
-                          disabled={updateRoleMutation.isPending}
-                        >
-                          {Object.entries(ROLES_CONFIG).map(([key, config]) => (
-                            <option key={key} value={key}>{config.label}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="p-4">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${user.is_active ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                          {user.is_active ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                          {user.is_active ? 'Activo' : 'Suspendido'}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right">
-                        <button 
-                          onClick={() => toggleStatusMutation.mutate({ id: user.id, is_active: !user.is_active })}
-                          className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                            user.is_active 
-                              ? 'text-red-600 hover:bg-red-50' 
-                              : 'text-green-600 hover:bg-green-50'
-                          }`}
-                        >
-                          {user.is_active ? 'Suspender' : 'Reactivar'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </RoleGuard>
-  );
-}
 
-function KpiCard({ title, value, icon }: { title: string, value: number, icon: React.ReactNode }) {
-  return (
-    <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 flex items-center gap-4">
-      <div className="p-3 bg-stone-50 rounded-xl">
-        {icon}
-      </div>
-      <div>
-        <p className="text-sm font-medium text-stone-500">{title}</p>
-        <p className="text-2xl font-bold text-stone-900">{value}</p>
+            <p className="text-stone-500 text-sm mb-3 ml-2">{filteredUsers.length} usuario(s)</p>
+
+            {/* Users List */}
+            <div className="space-y-3">
+              {isLoading ? (
+                <p className="text-center text-stone-400 py-10">Cargando...</p>
+              ) : filteredUsers.length === 0 ? (
+                <div className="text-center text-stone-400 py-10 flex flex-col items-center gap-2">
+                  <SearchSlash className="w-8 h-8 opacity-20" />
+                  <p>No se encontraron resultados.</p>
+                </div>
+              ) : (
+                filteredUsers.map((user) => (
+                  <div key={user.id} className="bg-white/80 p-4 rounded-2xl shadow-sm border border-[#F2E8D8] flex items-center gap-4 relative">
+                    {/* Avatar Mock */}
+                    <div className="w-12 h-12 bg-[#FDE8E6] rounded-full flex items-center justify-center shrink-0">
+                      <ShieldCheck className="text-[#D3574D] w-6 h-6" />
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-[15px] font-semibold text-stone-900 truncate">{user.name}</h3>
+                        {currentUser?.id === user.id && (
+                          <span className="bg-[#EBF3FF] text-[#2C62D6] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Tú
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[13px] text-stone-500 truncate mb-2">{user.email}</p>
+                      
+                      <div className="flex flex-wrap gap-2">
+                        <span className="bg-[#FDE8E6] text-[#D3574D] text-[11px] font-medium px-2 py-0.5 rounded-md capitalize">
+                          {user.role}
+                        </span>
+                        {user.is_active ? (
+                          <span className="bg-[#EBF7EE] text-[#25823D] text-[11px] font-medium px-2 py-0.5 rounded-md flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> Activo
+                          </span>
+                        ) : (
+                          <span className="bg-[#FDE8E6] text-[#D3574D] text-[11px] font-medium px-2 py-0.5 rounded-md flex items-center gap-1">
+                            <XCircle className="w-3 h-3" /> Suspendido
+                          </span>
+                        )}
+                        <span className="bg-stone-100 text-stone-500 text-[11px] font-medium px-2 py-0.5 rounded-md uppercase">
+                          {user.language_pref || 'ES'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {/* System Info */}
+            <h3 className="text-stone-500 text-sm font-medium mb-3 ml-2">Información del sistema</h3>
+            
+            <div className="bg-transparent space-y-4 mb-8">
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-3 text-stone-700">
+                  <Users className="w-5 h-5 opacity-60" />
+                  <span className="text-sm font-medium">Total de usuarios</span>
+                </div>
+                <span className="font-semibold text-stone-800">{stats.total}</span>
+              </div>
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-3 text-stone-700">
+                  <ShieldCheck className="w-5 h-5 opacity-60" />
+                  <span className="text-sm font-medium">Admins</span>
+                </div>
+                <span className="font-semibold text-stone-800">{stats.admins}</span>
+              </div>
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-3 text-stone-700">
+                  <Search className="w-5 h-5 opacity-60" />
+                  <span className="text-sm font-medium">Auditores</span>
+                </div>
+                <span className="font-semibold text-stone-800">{stats.auditores}</span>
+              </div>
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-3 text-stone-700">
+                  <Users className="w-5 h-5 opacity-60" />
+                  <span className="text-sm font-medium">Usuarios estándar</span>
+                </div>
+                <span className="font-semibold text-stone-800">{stats.estandar}</span>
+              </div>
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-3 text-stone-700">
+                  <XCircle className="w-5 h-5 opacity-60" />
+                  <span className="text-sm font-medium">Cuentas suspendidas</span>
+                </div>
+                <span className="font-semibold text-stone-800">{stats.suspendidas}</span>
+              </div>
+            </div>
+
+            <h3 className="text-stone-500 text-sm font-medium mb-3 ml-2 border-t border-stone-200/60 pt-6">Herramientas</h3>
+            <div className="space-y-2">
+              <Link href="/admin/audit" className="flex items-center justify-between p-3 rounded-2xl hover:bg-black/5 transition">
+                <div className="flex items-start gap-4">
+                  <Search className="w-6 h-6 text-[#9A5C9A] mt-1 shrink-0" />
+                  <div>
+                    <p className="font-medium text-stone-800">Ver logs de auditoría</p>
+                    <p className="text-[13px] text-stone-500">Historial completo de acciones del sistema</p>
+                  </div>
+                </div>
+                <div className="text-stone-400">›</div>
+              </Link>
+
+              <div className="flex items-center justify-between p-3 rounded-2xl hover:bg-black/5 transition cursor-pointer">
+                <div className="flex items-start gap-4">
+                  <ShieldCheck className="w-6 h-6 text-[#2C62D6] mt-1 shrink-0" />
+                  <div>
+                    <p className="font-medium text-stone-800">Mi cuenta</p>
+                    <p className="text-[13px] text-stone-500 capitalize">Rol: {currentUser?.role}</p>
+                  </div>
+                </div>
+                <div className="text-stone-400">›</div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
