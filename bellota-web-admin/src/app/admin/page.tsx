@@ -1,9 +1,9 @@
 'use client';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { User } from '@/types';
-import { Search, LogOut, Users, Settings, RotateCcw, ShieldCheck, CheckCircle2, XCircle, SearchSlash } from 'lucide-react';
+import { Search, LogOut, Users, Settings, RotateCcw, ShieldCheck, CheckCircle2, XCircle, SearchSlash, Power, UserCog } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 
@@ -11,6 +11,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'usuarios' | 'sistema'>('usuarios');
   const [search, setSearch] = useState('');
   const { user: currentUser, logout } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data: users = [], isLoading, refetch, isFetching } = useQuery<User[]>({
     queryKey: ['users'],
@@ -20,6 +21,20 @@ export default function AdminDashboard() {
     },
     // Prevent refetch on window focus to avoid annoying loading states in mobile
     refetchOnWindowFocus: false,
+  });
+
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ id, role }: { id: number; role: string }) => {
+      await api.put(`/admin/users/${id}/role`, { role });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, is_active }: { id: number; is_active: boolean }) => {
+      await api.put(`/admin/users/${id}/status`, { is_active });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
   });
 
   const filteredUsers = users.filter(u => 
@@ -124,20 +139,32 @@ export default function AdminDashboard() {
                       </div>
                       <p className="text-[13px] text-stone-500 truncate mb-2">{user.email}</p>
                       
-                      <div className="flex flex-wrap gap-2">
-                        <span className="bg-[#FDE8E6] text-[#D3574D] text-[11px] font-medium px-2 py-0.5 rounded-md capitalize">
-                          {user.role}
-                        </span>
-                        {user.is_active ? (
-                          <span className="bg-[#EBF7EE] text-[#25823D] text-[11px] font-medium px-2 py-0.5 rounded-md flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Activo
-                          </span>
-                        ) : (
-                          <span className="bg-[#FDE8E6] text-[#D3574D] text-[11px] font-medium px-2 py-0.5 rounded-md flex items-center gap-1">
-                            <XCircle className="w-3 h-3" /> Suspendido
-                          </span>
-                        )}
-                        <span className="bg-stone-100 text-stone-500 text-[11px] font-medium px-2 py-0.5 rounded-md uppercase">
+                      <div className="flex flex-wrap gap-2 items-center mt-1">
+                        <select
+                          className="bg-[#FDE8E6] text-[#D3574D] text-[11px] font-medium px-2 py-1 rounded-md capitalize border-none outline-none cursor-pointer appearance-none"
+                          value={user.role}
+                          onChange={(e) => updateRoleMutation.mutate({ id: user.id, role: e.target.value })}
+                          disabled={updateRoleMutation.isPending || currentUser?.id === user.id}
+                        >
+                          <option value="usuario">Usuario</option>
+                          <option value="auditor">Auditor</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                        
+                        <button
+                          onClick={() => updateStatusMutation.mutate({ id: user.id, is_active: !user.is_active })}
+                          disabled={updateStatusMutation.isPending || currentUser?.id === user.id}
+                          className={`text-[11px] font-medium px-2 py-1 rounded-md flex items-center gap-1 cursor-pointer transition-colors ${
+                            user.is_active 
+                              ? "bg-[#EBF7EE] text-[#25823D] hover:bg-[#c9ebd1]" 
+                              : "bg-[#FDE8E6] text-[#D3574D] hover:bg-[#fad1cd]"
+                          }`}
+                        >
+                          {user.is_active ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                          {user.is_active ? 'Activo' : 'Suspendido'}
+                        </button>
+                        
+                        <span className="bg-stone-100 text-stone-500 text-[11px] font-medium px-2 py-1 rounded-md uppercase cursor-default">
                           {user.language_pref || 'ES'}
                         </span>
                       </div>
